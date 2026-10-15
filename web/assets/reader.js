@@ -45,8 +45,9 @@
       var p = chapter.pages[page];
       var wrap = el('div', { class: 'rd-frame' });
       var img = el('img', { class: 'rd-img is-loading', alt: 'Página ' + (page + 1) + ' de ' + total(), decoding: 'async', draggable: 'false' });
+      zoomImg = img;
       if (p.width && p.height) { img.width = p.width; img.height = p.height; }
-      img.addEventListener('load', function () { img.classList.remove('is-loading'); });
+      img.addEventListener('load', function () { img.classList.remove('is-loading'); reflow(); });
       img.addEventListener('error', function () {
         img.classList.remove('is-loading');
         wrap.replaceChildren(el('div', { class: 'rd-empty' },
@@ -56,6 +57,7 @@
       img.src = p.url;
       wrap.append(img);
       stage.append(wrap);
+      resetZoom();
       preload(page + 1);
       preload(page + 2);
     }
@@ -142,15 +144,153 @@
       step(d);
     });
 
-    var sx = 0, sy = 0, tracking = false;
-    stage.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse') return; tracking = true; sx = e.clientX; sy = e.clientY; });
-    stage.addEventListener('pointerup', function (e) {
-      if (!tracking) return;
-      tracking = false;
-      var dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) > 50 && Math.abs(dy) < 40) step((dx > 0) === rtl ? 1 : -1);
+    /* ---------- zoom táctil: pellizco, arrastre y doble toque ---------- */
+    var MIN_SCALE = 1, MAX_SCALE = 4;
+    var scale = 1, tx = 0, ty = 0;
+    var pointers = new Map();
+    var prevDist = 0, prevMid = null;
+    var gesture = null;
+    var lastTap = { t: 0, x: 0, y: 0 };
+    var zoomImg = null;
+
+    // Geometría de la imagen sin transformar, en coordenadas del escenario.
+    function imgGeom() {
+      if (!zoomImg) return null;
+      var r = zoomImg.getBoundingClientRect();
+      var sr = stage.getBoundingClientRect();
+      return {
+        w: r.width / scale, h: r.height / scale,
+        cx: (r.left + r.width / 2 - tx) - sr.left,
+        cy: (r.top + r.height / 2 - ty) - sr.top,
+        sw: stage.clientWidth, sh: stage.clientHeight, sr: sr,
+      };
+    }
+    // Mantiene la imagen dentro del recuadro (o centrada si es más chica).
+    function clampT(g) {
+      if (!g) return;
+      var cw = scale * g.w, ch = scale * g.h;
+      if (cw <= g.sw + 0.5) tx = g.sw / 2 - g.cx;
+      else tx = Math.max(g.sw - g.cx - cw / 2, Math.min(cw / 2 - g.cx, tx));
+      if (ch <= g.sh + 0.5) ty = g.sh / 2 - g.cy;
+      else ty = Math.max(g.sh - g.cy - ch / 2, Math.min(ch / 2 - g.cy, ty));
+    }
+    function applyZoom() {
+      if (!zoomImg) return;
+      var active = Math.abs(scale - 1) > 0.001 || Math.abs(tx) > 0.5 || Math.abs(ty) > 0.5;
+      zoomImg.style.transform = active
+        ? 'translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px) scale(' + scale.toFixed(4) + ')'
+        : '';
+      root.classList.toggle('is-zoomed', scale > 1.001);
+    }
+    function resetZoom() { scale = 1; tx = 0; ty = 0; applyZoom(); }
+    function reflow() { var g = imgGeom(); clampT(g); applyZoom(); }
+    function zoomAt(clientX, clientY, target) {
+      var g = imgGeom(); if (!g) return;
+      var s2 = Math.max(MIN_SCALE, Math.min(MAX_SCALE, target));
+      var k = s2 / scale;
+      var px = clientX - g.sr.left, py = clientY - g.sr.top;
+      tx = (px - g.cx) * (1 - k) + k * tx;
+      ty = (py - g.cy) * (1 - k) + k * ty;
+      scale = s2;
+      clampT(g); applyZoom();
+    }
+
+    function ptPos(e) { return { x: e.clientX, y: e.clientY }; }
+
+    stage.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse') return;
+      pointers.set(e.pointerId, ptPos(e));
+      if (pointers.size === 2) {
+        var pts = Array.from(pointers.values());
+        prevDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+        prevMid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        gesture = null;
+      } else if (pointers.size === 1) {
+        gesture = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t: Date.now(), mode: null };
+      }
+      try { if (stage.setPointerCapture) stage.setPointerCapture(e.pointerId); } catch (err) {}
     });
-    stage.addEventListener('pointercancel', function () { tracking = false; });
+
+    stage.addEventListener('pointermove', function (e) {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, ptPos(e));
+
+      if (pointers.size >= 2 && prevMid) {
+        e.preventDefault();
+        var pts = Array.from(pointers.values());
+        var dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+        var mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        var g = imgGeom();
+        if (g) {
+          var s2 = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * (dist / prevDist)));
+          var k = s2 / scale;
+          var px = mid.x - g.sr.left, py = mid.y - g.sr.top;
+          tx = (px - g.cx) * (1 - k) + k * tx;
+          ty = (py - g.cy) * (1 - k) + k * ty;
+          scale = s2;
+          clampT(g); applyZoom();
+        }
+        prevDist = dist; prevMid = mid;
+        return;
+      }
+
+      if (!gesture) return;
+      if (!gesture.mode && (Math.abs(e.clientX - gesture.x) > 8 || Math.abs(e.clientY - gesture.y) > 8)) {
+        var g2 = imgGeom();
+        var cw = g2 ? scale * g2.w : 0, ch = g2 ? scale * g2.h : 0;
+        var horizontal = Math.abs(e.clientX - gesture.x) > Math.abs(e.clientY - gesture.y);
+        if (!g2) gesture.mode = 'none';
+        else if (horizontal && cw > g2.sw + 1) gesture.mode = 'pan';
+        else if (!horizontal && ch > g2.sh + 1) gesture.mode = 'pan';
+        else if (horizontal) gesture.mode = 'swipe';
+        else gesture.mode = 'none';
+      }
+      if (gesture.mode === 'pan') {
+        e.preventDefault();
+        var g3 = imgGeom();
+        tx += e.clientX - gesture.lx;
+        ty += e.clientY - gesture.ly;
+        if (g3) clampT(g3);
+        applyZoom();
+        gesture.lx = e.clientX; gesture.ly = e.clientY;
+      }
+    });
+
+    function endPointer(e) {
+      if (!pointers.has(e.pointerId)) return;
+      var wasSingle = pointers.size === 1;
+      pointers.delete(e.pointerId);
+      try { if (stage.releasePointerCapture) stage.releasePointerCapture(e.pointerId); } catch (err) {}
+      if (pointers.size !== 0) return;
+      prevDist = 0; prevMid = null;
+      if (wasSingle && gesture && gesture.mode !== 'pan') {
+        var dur = Date.now() - gesture.t;
+        var ddx = e.clientX - gesture.x, ddy = e.clientY - gesture.y;
+        var moved = Math.hypot(ddx, ddy);
+        if (moved < 12 && dur < 300) {
+          var now = Date.now();
+          if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) {
+            lastTap.t = 0;
+            if (scale > 1.05) resetZoom(); else zoomAt(e.clientX, e.clientY, 2.5);
+          } else {
+            lastTap = { t: now, x: e.clientX, y: e.clientY };
+          }
+        } else if (gesture.mode === 'swipe' || (!gesture.mode && Math.abs(ddx) > 50 && Math.abs(ddy) < 40)) {
+          step((ddx > 0) === rtl ? 1 : -1);
+        }
+      }
+      gesture = null;
+    }
+    stage.addEventListener('pointerup', endPointer);
+    stage.addEventListener('pointercancel', function (e) {
+      pointers.delete(e.pointerId);
+      if (pointers.size === 0) { prevDist = 0; prevMid = null; gesture = null; }
+    });
+    stage.addEventListener('dblclick', function (e) {
+      e.preventDefault();
+      if (scale > 1.05) resetZoom(); else zoomAt(e.clientX, e.clientY, 2.5);
+    });
+    window.addEventListener('resize', reflow);
 
     render();
 
@@ -172,13 +312,16 @@
       get fit() { return fit; },
       setRtl: function (b) { rtl = !!b; render(); },
       setMode: function (m) { mode = m === 'scroll' ? 'scroll' : 'page'; render(); },
-      setFit: function (f) { fit = f === 'width' ? 'width' : 'screen'; root.classList.toggle('is-fit-width', fit === 'width'); },
+      setFit: function (f) { fit = f === 'width' ? 'width' : 'screen'; root.classList.toggle('is-fit-width', fit === 'width'); resetZoom(); reflow(); },
       focus: function () { root.focus({ preventScroll: true }); },
       say: function (msg) { note.textContent = msg || ''; note.classList.toggle('on', !!msg); },
+      resetZoom: resetZoom,
+      reflow: reflow,
       destroy: function () {
         if (destroyed) return;
         destroyed = true;
         if (observer) observer.disconnect();
+        window.removeEventListener('resize', reflow);
         root.remove();
       },
     };

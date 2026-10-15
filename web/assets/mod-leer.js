@@ -104,7 +104,7 @@
         fullHome = null;
         if (document.fullscreenElement && document.exitFullscreen) { var q = document.exitFullscreen(); if (q && q.catch) q.catch(function () {}); }
       }
-      setTimeout(function () { reader.focus(); }, 0);
+      setTimeout(function () { reader.focus(); if (reader.reflow) reader.reflow(); }, 0);
     }
     function onFsChange() { if (isFull && !document.fullscreenElement) setFull(false); }
     function onFullKey(e) { if (e.key === 'Escape' && isFull && !document.fullscreenElement) { e.stopPropagation(); setFull(false); } }
