@@ -29,7 +29,6 @@ services:
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
       ADMIN_USERNAME: ${ADMIN_USERNAME:?Definí ADMIN_USERNAME en .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Definí ADMIN_PASSWORD en .env}
-      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
     ports:
       - "${PORT:-3000}:3000"
     volumes:

@@ -13,7 +13,7 @@ export const TEST_DB = process.env.TEST_DATABASE_URL || 'postgres://postgres@127
 /** Levanta la app real contra una base limpia y devuelve utilidades para probarla. */
 export async function startTestApp(extraEnv = {}) {
   const uploadDir = await fs.mkdtemp(path.join(os.tmpdir(), 'valle-uploads-'));
-  const config = loadConfig({ DATABASE_URL: TEST_DB, UPLOAD_DIR: uploadDir, MAX_UPLOAD_MB: '2', RATE_AUTH_MAX: '1000', RATE_GUESTBOOK_MAX: '1000', ...extraEnv });
+  const config = loadConfig({ DATABASE_URL: TEST_DB, UPLOAD_DIR: uploadDir, RATE_AUTH_MAX: '1000', RATE_GUESTBOOK_MAX: '1000', ...extraEnv });
   const db = createDb(config.databaseUrl);
   await db.query('drop schema public cascade');
   await db.query('create schema public');

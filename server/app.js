@@ -89,9 +89,6 @@ export async function createApp({ config, db }) {
     if (err instanceof HttpError) {
       return res.status(err.status).json({ error: { message: err.message, code: err.code } });
     }
-    if (err?.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: { message: `Una imagen supera el máximo de ${Math.round(config.maxUploadBytes / 1048576)} MB.`, code: 'too_large' } });
-    }
     if (err?.code === 'LIMIT_FILE_COUNT' || err?.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({ error: { message: 'Demasiados archivos en un mismo envío.', code: 'bad_request' } });
     }

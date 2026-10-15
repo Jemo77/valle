@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
-import { makeAdmin, makePng, pngForm, startTestApp } from './helpers.js';
+import { makeAdmin, pngForm, startTestApp } from './helpers.js';
 
 let ctx;
 let admin;
@@ -230,15 +230,6 @@ describe('biblioteca: series, capítulos y páginas', () => {
     assert.equal((await admin.del(`/api/admin/series/${seriesId}`)).status, 200);
     await assert.rejects(fs.readdir(dir));
     assert.equal((await anon.get('/api/series')).json.series.length, 0);
-  });
-
-  it('limita el tamaño de cada imagen', async () => {
-    const s = (await admin.post('/api/admin/series', { title: 'Grande' })).json.series;
-    const c = (await admin.post(`/api/admin/series/${s.id}/chapters`, { number: 1 })).json.chapter;
-    const fd = new FormData();
-    fd.append('pages', new Blob([Buffer.concat([makePng(8, 8), Buffer.alloc(3 * 1024 * 1024)])], { type: 'image/png' }), 'enorme.png');
-    const r = await admin.post(`/api/admin/chapters/${c.id}/pages`, fd);
-    assert.equal(r.status, 413);
   });
 });
 

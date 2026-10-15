@@ -19,7 +19,6 @@ export function loadConfig(env = process.env) {
     trustProxy: bool(env.TRUST_PROXY, false),
     allowRegistration: bool(env.ALLOW_REGISTRATION, true),
     autoMigrate: bool(env.AUTO_MIGRATE, true),
-    maxUploadBytes: (Number(env.MAX_UPLOAD_MB) || 15) * 1024 * 1024,
     sessionDays: Number(env.SESSION_DAYS) || 30,
     // Pedidos permitidos por minuto y por IP
     rate: {

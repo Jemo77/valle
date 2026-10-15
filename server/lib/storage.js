@@ -26,7 +26,7 @@ export function createStorage(config) {
 
   const upload = multer({
     dest: tmpDir,
-    limits: { fileSize: config.maxUploadBytes, files: 120, fields: 20 },
+    limits: { files: 120, fields: 20 },
   });
 
   /**
