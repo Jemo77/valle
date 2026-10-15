@@ -80,16 +80,29 @@
 
     /* ---------- pantalla completa ---------- */
     var isFull = false;
+    var fullHome = null; // dónde estaba el contenedor antes de sacarlo a <body>
     function setFull(on) {
+      if (on === isFull) return;
       isFull = on;
       fullBtn.textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa';
       fullBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      box.classList.toggle('is-full', on);
-      document.documentElement.classList.toggle('r-locked', on);
       if (on) {
+        // Sacamos el contenedor a <body>: así position:fixed usa la ventana y no un
+        // ancestro con filtros/transformaciones (el panel tiene backdrop-filter).
+        fullHome = { parent: box.parentNode, next: box.nextSibling };
+        document.body.append(box);
+        box.classList.add('is-full');
+        document.documentElement.classList.add('r-locked');
         if (box.requestFullscreen) { var p = box.requestFullscreen(); if (p && p.catch) p.catch(function () {}); }
-      } else if (document.fullscreenElement && document.exitFullscreen) {
-        var q = document.exitFullscreen(); if (q && q.catch) q.catch(function () {});
+      } else {
+        box.classList.remove('is-full');
+        document.documentElement.classList.remove('r-locked');
+        if (fullHome && fullHome.parent) {
+          if (fullHome.next && fullHome.next.parentNode === fullHome.parent) fullHome.parent.insertBefore(box, fullHome.next);
+          else fullHome.parent.append(box);
+        }
+        fullHome = null;
+        if (document.fullscreenElement && document.exitFullscreen) { var q = document.exitFullscreen(); if (q && q.catch) q.catch(function () {}); }
       }
       setTimeout(function () { reader.focus(); }, 0);
     }
@@ -132,11 +145,7 @@
         clearTimeout(progressT);
         document.removeEventListener('fullscreenchange', onFsChange);
         document.removeEventListener('keydown', onFullKey);
-        if (isFull) {
-          box.classList.remove('is-full');
-          document.documentElement.classList.remove('r-locked');
-          if (document.fullscreenElement && document.exitFullscreen) { var q = document.exitFullscreen(); if (q && q.catch) q.catch(function () {}); }
-        }
+        if (isFull) setFull(false);
         reader.destroy();
         V.clear(box);
       },
