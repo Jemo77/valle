@@ -64,7 +64,7 @@ Traducir y publicar un manga que tiene editorial o licencia es, en general, una 
 
 ## Seguridad: qué ya está resuelto
 
-Contraseñas con scrypt; sesiones en base con token hasheado y cookie `HttpOnly` + `SameSite=Lax`; verificación de origen en pedidos que cambian datos; límites de pedidos para login y libro de visitas; cabeceras CSP; subidas validadas por contenido real (no por extensión) y servidas sin ejecutar; rutas de `/media` a prueba de path traversal; WebSocket con verificación de origen y topes por conexión. Lo que falta está en `PLAN.md` (Fase 1).
+Contraseñas con scrypt; sesiones en base con token hasheado y cookie `HttpOnly` + `SameSite=Lax`; verificación de origen en pedidos que cambian datos; límites de pedidos para login y libro de visitas; cabeceras CSP; subidas validadas por contenido real (no por extensión) y convertidas a WebP (calidad 70, con pérdida) antes de guardarlas; rutas de `/media` a prueba de path traversal; WebSocket con verificación de origen y topes por conexión. Lo que falta está en `PLAN.md` (Fase 1).
 
 ## Estructura
 

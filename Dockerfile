@@ -6,7 +6,6 @@ RUN npm ci --omit=dev
 COPY db ./db
 COPY server ./server
 COPY web ./web
-COPY seed ./seed
 RUN mkdir -p /data/uploads && chown -R node:node /data /app
 USER node
 ENV UPLOAD_DIR=/data/uploads PORT=3000

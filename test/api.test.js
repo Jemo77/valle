@@ -142,7 +142,7 @@ describe('biblioteca: series, capítulos y páginas', () => {
   it('sube una portada válida y rechaza archivos que no son imágenes', async () => {
     const ok = await admin.post(`/api/admin/series/${seriesId}/cover`, pngForm('cover', ['portada.png']));
     assert.equal(ok.status, 200);
-    assert.match(ok.json.coverUrl, /^\/media\/series\/\d+\/cover-.+\.png$/);
+    assert.match(ok.json.coverUrl, /^\/media\/biblioteca\/estrato-hueco\/portada-[a-f0-9]{8}\.webp$/);
 
     const fd = new FormData();
     fd.append('cover', new Blob(['<script>alert(1)</script>'], { type: 'image/png' }), 'portada.png');
@@ -185,7 +185,7 @@ describe('biblioteca: series, capítulos y páginas', () => {
     assert.equal(chap.nextId, null);
     const img = await anon.get(chap.pages[0].url, { raw: true });
     assert.equal(img.status, 200);
-    assert.equal(img.headers.get('content-type'), 'image/png');
+    assert.equal(img.headers.get('content-type'), 'image/webp');
   });
 
   it('calcula capítulo anterior y siguiente', async () => {
@@ -225,7 +225,7 @@ describe('biblioteca: series, capítulos y páginas', () => {
   });
 
   it('borrar la serie borra también sus archivos', async () => {
-    const dir = path.join(ctx.uploadDir, 'series', String(seriesId));
+    const dir = path.join(ctx.uploadDir, 'biblioteca', 'estrato-hueco');
     assert.ok((await fs.readdir(dir)).length > 0);
     assert.equal((await admin.del(`/api/admin/series/${seriesId}`)).status, 200);
     await assert.rejects(fs.readdir(dir));

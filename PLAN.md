@@ -19,7 +19,7 @@ Estado actual (v0.2): sitio público, administración, cuentas, biblioteca con l
 Lo mínimo para dormir tranquilo.
 
 - [ ] **Copias de seguridad automáticas:** `pg_dump` diario + copia de `/data/uploads` a un almacenamiento externo (Backblaze B2, S3, otro VPS). Probar una restauración de verdad.
-- [ ] **Miniaturas y WebP:** generar versiones livianas de las páginas al subirlas (con `sharp`) y servir la adecuada al ancho de pantalla. Hoy se sirve el original.
+- [ ] **Miniaturas:** hoy las páginas se convierten a WebP (calidad 70, con pérdida) al subirlas; falta generar miniaturas y servir la versión adecuada al ancho de pantalla.
 - [ ] **Subida en lote por ZIP:** arrastrar un `.zip` con el capítulo completo y que se ordene solo.
 - [ ] **Recuperar contraseña:** hoy se resetea con `npm run create-admin`; falta un flujo por correo (requiere un proveedor de mail, por ejemplo Resend o Brevo) para las lectoras/es.
 - [ ] **Límites y registros:** mover los límites de pedidos de memoria a la base (o Redis) para que sobrevivan reinicios; registro de errores en un servicio (Sentry) o al menos en archivos rotados.

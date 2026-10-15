@@ -1,8 +1,16 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { bad, conflict, id, notFound, num, oneOf, str, url } from '../lib/http.js';
-import { naturalCompare, uniqueSlug } from '../lib/util.js';
+import { naturalCompare, slugify, uniqueSlug } from '../lib/util.js';
 
 const bool = (v) => v === true || v === 'true' || v === '1' || v === 1;
+
+/** Carpeta legible de un capítulo dentro de la carpeta del manga: "1-despertar" (o "2" sin título). */
+function chapterFolder(number, title) {
+  const n = String(Number(number));
+  const slug = title ? slugify(title) : '';
+  return slug && slug !== 'sin-titulo' ? `${n}-${slug}` : n;
+}
 
 export function adminRoutes({ db, auth, storage, settings, hub }) {
   const r = Router();
@@ -116,10 +124,11 @@ export function adminRoutes({ db, auth, storage, settings, hub }) {
 
   r.delete('/series/:id', async (req, res) => {
     const sid = id(req.params.id);
-    const cur = await db.one('select id from series where id = $1', [sid]);
+    const cur = await db.one('select slug from series where id = $1', [sid]);
     if (!cur) throw notFound('Esa serie no existe.');
     await db.query('delete from series where id = $1', [sid]);
-    await storage.removeDir(`series/${sid}`);
+    await storage.removeDir(`biblioteca/${cur.slug}`);
+    await storage.removeDir(`series/${sid}`); // restos de versiones anteriores
     res.json({ ok: true });
   });
 
@@ -127,9 +136,9 @@ export function adminRoutes({ db, auth, storage, settings, hub }) {
     const sid = id(req.params.id);
     try {
       if (!req.file) throw bad('Elegí una imagen para la portada.');
-      const cur = await db.one('select cover from series where id = $1', [sid]);
+      const cur = await db.one('select cover, slug from series where id = $1', [sid]);
       if (!cur) throw notFound('Esa serie no existe.');
-      const saved = await storage.saveImage(req.file, `series/${sid}`, 'cover-');
+      const saved = await storage.saveImage(req.file, `biblioteca/${cur.slug}`, { name: `portada-${crypto.randomBytes(4).toString('hex')}` });
       await db.query('update series set cover = $2, updated_at = now() where id = $1', [sid, saved.rel]);
       await storage.remove(cur.cover);
       res.json({ coverUrl: storage.urlFor(saved.rel) });
@@ -181,10 +190,14 @@ export function adminRoutes({ db, auth, storage, settings, hub }) {
 
   r.delete('/chapters/:id', async (req, res) => {
     const cid = id(req.params.id);
-    const cur = await db.one('select series_id from chapters where id = $1', [cid]);
+    const cur = await db.one(
+      `select c.series_id, c.number, c.title, s.slug from chapters c join series s on s.id = c.series_id where c.id = $1`,
+      [cid],
+    );
     if (!cur) throw notFound('Ese capítulo no existe.');
     await db.query('delete from chapters where id = $1', [cid]);
-    await storage.removeDir(`series/${cur.series_id}/${cid}`);
+    await storage.removeDir(`biblioteca/${cur.slug}/${chapterFolder(cur.number, cur.title)}`);
+    await storage.removeDir(`series/${cur.series_id}/${cid}`); // restos de versiones anteriores
     res.json({ ok: true });
   });
 
@@ -202,17 +215,24 @@ export function adminRoutes({ db, auth, storage, settings, hub }) {
     const cid = id(req.params.id);
     const files = req.files || [];
     try {
-      const cur = await db.one('select series_id from chapters where id = $1', [cid]);
+      const cur = await db.one(
+        `select c.series_id, c.number, c.title, s.slug from chapters c join series s on s.id = c.series_id where c.id = $1`,
+        [cid],
+      );
       if (!cur) throw notFound('Ese capítulo no existe.');
       if (!files.length) throw bad('No llegó ninguna imagen.');
       // Si el cliente manda "sort=name", se ordenan por nombre natural (2 antes que 10).
       const ordered = req.body.sort === 'name'
         ? [...files].sort((a, b) => naturalCompare(a.originalname, b.originalname))
         : files;
+      const max = await db.one('select coalesce(max(position), -1) as m from pages where chapter_id = $1', [cid]);
+      const dir = `biblioteca/${cur.slug}/${chapterFolder(cur.number, cur.title)}`;
       const saved = [];
-      for (const f of ordered) saved.push(await storage.saveImage(f, `series/${cur.series_id}/${cid}`));
+      for (const f of ordered) {
+        const position = max.m + 1 + saved.length;
+        saved.push(await storage.saveImage(f, dir, { name: String(position + 1).padStart(2, '0') }));
+      }
       const added = await db.tx(async (t) => {
-        const max = await t.one('select coalesce(max(position), -1) as m from pages where chapter_id = $1', [cid]);
         const out = [];
         for (let i = 0; i < saved.length; i += 1) {
           out.push(await t.one(
