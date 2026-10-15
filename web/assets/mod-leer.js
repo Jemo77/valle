@@ -8,6 +8,8 @@
     set rtl(v) { V.ls.set('rtl', v ? '1' : '0'); },
     get mode() { return V.ls.get('mode') === 'scroll' ? 'scroll' : 'page'; },
     set mode(v) { V.ls.set('mode', v); },
+    get fit() { return V.ls.get('fit') === 'width' ? 'width' : 'screen'; },
+    set fit(v) { V.ls.set('fit', v); },
   };
 
   /**
@@ -23,10 +25,13 @@
     var pgOut = el('span', { id: 'r-pg', text: '— / —', 'aria-live': 'polite' });
     var dirBtn = el('button', { type: 'button', class: 'chip' });
     var modeBtn = el('button', { type: 'button', class: 'chip' });
+    var fitBtn = el('button', { type: 'button', class: 'chip' });
+    var fullBtn = el('button', { type: 'button', class: 'chip', text: 'Pantalla completa', 'aria-pressed': 'false' });
     var bar = el('div', { class: 'rbar' },
       el('div', { class: 'rt' }, titleB, titleS),
-      el('div', { class: 'rctl' }, dirBtn, modeBtn));
-    var host = el('div');
+      el('div', { class: 'rctl' }, dirBtn, modeBtn, fitBtn, fullBtn));
+    var host = el('div', { class: 'rfull-body' });
+    box.classList.add('rfull');
     var prevBtn = el('button', { type: 'button', class: 'btn', text: '← Capítulo anterior' });
     var nextBtn = el('button', { type: 'button', class: 'btn pri', text: 'Capítulo siguiente →' });
     var navRow = el('div', { class: 'rnav' }, prevBtn, pgOut, nextBtn);
@@ -38,7 +43,7 @@
     var destroyed = false;
 
     var reader = V.createReader({
-      container: host, rtl: prefs.rtl, mode: prefs.mode,
+      container: host, rtl: prefs.rtl, mode: prefs.mode, fit: prefs.fit,
       onPage: function (p, total) {
         pgOut.textContent = total ? (p + 1) + ' / ' + total : '— / —';
         if (chapter) {
@@ -61,13 +66,38 @@
       dirBtn.hidden = reader.mode === 'scroll';
       modeBtn.textContent = reader.mode === 'scroll' ? 'Continuo' : 'Página a página';
       modeBtn.setAttribute('aria-pressed', reader.mode === 'scroll' ? 'true' : 'false');
+      fitBtn.textContent = reader.fit === 'width' ? 'Ajustar a la pantalla' : 'Ajustar al ancho';
+      fitBtn.setAttribute('aria-pressed', reader.fit === 'width' ? 'true' : 'false');
+      fitBtn.hidden = reader.mode === 'scroll';
       prevBtn.disabled = !chapter || !chapter.prevId || !!opts.lockNav;
       nextBtn.disabled = !chapter || !chapter.nextId || !!opts.lockNav;
     }
     dirBtn.addEventListener('click', function () { reader.setRtl(!reader.rtl); prefs.rtl = reader.rtl; syncButtons(); });
     modeBtn.addEventListener('click', function () { reader.setMode(reader.mode === 'scroll' ? 'page' : 'scroll'); prefs.mode = reader.mode; syncButtons(); });
+    fitBtn.addEventListener('click', function () { reader.setFit(reader.fit === 'width' ? 'screen' : 'width'); prefs.fit = reader.fit; syncButtons(); });
     prevBtn.addEventListener('click', function () { if (chapter && chapter.prevId) loadChapter(chapter.prevId, 0, true); });
     nextBtn.addEventListener('click', function () { if (chapter && chapter.nextId) loadChapter(chapter.nextId, 0, true); });
+
+    /* ---------- pantalla completa ---------- */
+    var isFull = false;
+    function setFull(on) {
+      isFull = on;
+      fullBtn.textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa';
+      fullBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      box.classList.toggle('is-full', on);
+      document.documentElement.classList.toggle('r-locked', on);
+      if (on) {
+        if (box.requestFullscreen) { var p = box.requestFullscreen(); if (p && p.catch) p.catch(function () {}); }
+      } else if (document.fullscreenElement && document.exitFullscreen) {
+        var q = document.exitFullscreen(); if (q && q.catch) q.catch(function () {});
+      }
+      setTimeout(function () { reader.focus(); }, 0);
+    }
+    function onFsChange() { if (isFull && !document.fullscreenElement) setFull(false); }
+    function onFullKey(e) { if (e.key === 'Escape' && isFull && !document.fullscreenElement) { e.stopPropagation(); setFull(false); } }
+    fullBtn.addEventListener('click', function () { setFull(!isFull); });
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('keydown', onFullKey);
 
     function loadChapter(id, page, notify) {
       var my = ++token;
@@ -97,7 +127,19 @@
       loadChapter: loadChapter,
       setPage: function (p) { reader.goto(p, { silent: true }); pgOut.textContent = (reader.page + 1) + ' / ' + reader.total; },
       setLock: function (b) { opts.lockNav = b; syncButtons(); },
-      destroy: function () { destroyed = true; clearTimeout(progressT); reader.destroy(); V.clear(box); },
+      destroy: function () {
+        destroyed = true;
+        clearTimeout(progressT);
+        document.removeEventListener('fullscreenchange', onFsChange);
+        document.removeEventListener('keydown', onFullKey);
+        if (isFull) {
+          box.classList.remove('is-full');
+          document.documentElement.classList.remove('r-locked');
+          if (document.fullscreenElement && document.exitFullscreen) { var q = document.exitFullscreen(); if (q && q.catch) q.catch(function () {}); }
+        }
+        reader.destroy();
+        V.clear(box);
+      },
     };
   };
 

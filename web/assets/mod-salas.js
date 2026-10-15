@@ -297,14 +297,20 @@
 
     function buildPicker() {
       V.clear(picker);
-      if (!canNav || !info || !info.seriesId) return;
+      if (!info || !info.seriesId) return;
       api.getSeries(info.seriesId).then(function (d) {
         if (destroyed) return;
         seriesChapters = d.chapters;
-        if (!seriesChapters.length) { picker.append(el('p', { class: 'muted', text: 'Esta serie todavía no tiene capítulos publicados.' })); return; }
-        var sel = el('select', { 'aria-label': 'Capítulo del grupo' }, seriesChapters.map(function (c) { return el('option', { value: String(c.id), text: V.chapterLabel(c) }); }));
+        if (!seriesChapters.length) {
+          picker.append(el('p', { class: 'muted', text: 'Esta serie todavía no tiene capítulos publicados.' }));
+          return;
+        }
+        var sel = el('select', { 'aria-label': 'Capítulo del grupo' });
+        seriesChapters.forEach(function (c) { sel.append(el('option', { value: String(c.id), text: V.chapterLabel(c) })); });
         if (remote.chapterId != null) sel.value = String(remote.chapterId);
+        sel.disabled = !canNav;
         sel.addEventListener('change', function () {
+          if (!canNav) { sel.value = remote.chapterId != null ? String(remote.chapterId) : sel.value; return; }
           var picked = seriesChapters.filter(function (c) { return String(c.id) === sel.value; })[0];
           if (!picked) return;
           var id = picked.id;
@@ -313,8 +319,20 @@
           remote = { chapterId: id, page: 0 };
           applyRemote(id, 0);
         });
-        picker.append(el('label', { class: 'field', style: { marginBottom: '10px' } }, el('span', { text: 'Capítulo del grupo' }), sel));
+        picker.append(el('label', { class: 'field', style: { marginBottom: '10px' } },
+          el('span', { text: canNav ? 'Capítulo del grupo' : 'Capítulo del grupo (lo elige quien guía)' }), sel));
+        if (!canNav) picker.append(el('p', { class: 'muted', style: { marginTop: '6px' }, text: 'Quien guía elige el capítulo; vos seguís el ritmo.' }));
         picker._sel = sel;
+
+        // Si nadie eligió todavía y vos guiás, arrancamos por el primero así ya hay algo para leer.
+        if (canNav && remote.chapterId == null) {
+          var first = seriesChapters[0];
+          sel.value = String(first.id);
+          lastChapterSent = first.id;
+          channel.send('nav', { chapterId: first.id, page: 0 });
+          remote = { chapterId: first.id, page: 0 };
+          applyRemote(first.id, 0);
+        }
       }, function () {});
     }
 

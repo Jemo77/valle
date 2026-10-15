@@ -17,6 +17,7 @@
     var page = 0;
     var rtl = opts.rtl !== false;
     var mode = opts.mode || 'page';
+    var fit = opts.fit === 'width' ? 'width' : 'screen';
     var observer = null;
     var suppress = false;
     var destroyed = false;
@@ -95,6 +96,7 @@
     function render() {
       root.classList.toggle('is-scroll', mode === 'scroll');
       root.classList.toggle('is-rtl', rtl);
+      root.classList.toggle('is-fit-width', fit === 'width');
       if (mode === 'scroll') { stage.hidden = true; scroller.hidden = false; zoneL.hidden = zoneR.hidden = true; renderScroll(); scrollToPage(page); }
       else { stage.hidden = false; scroller.hidden = true; zoneL.hidden = zoneR.hidden = false; renderPage(); }
       zoneL.setAttribute('aria-label', rtl ? 'Página siguiente' : 'Página anterior');
@@ -167,8 +169,10 @@
       get total() { return total(); },
       get rtl() { return rtl; },
       get mode() { return mode; },
+      get fit() { return fit; },
       setRtl: function (b) { rtl = !!b; render(); },
       setMode: function (m) { mode = m === 'scroll' ? 'scroll' : 'page'; render(); },
+      setFit: function (f) { fit = f === 'width' ? 'width' : 'screen'; root.classList.toggle('is-fit-width', fit === 'width'); },
       focus: function () { root.focus({ preventScroll: true }); },
       say: function (msg) { note.textContent = msg || ''; note.classList.toggle('on', !!msg); },
       destroy: function () {

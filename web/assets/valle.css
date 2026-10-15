@@ -329,6 +329,18 @@ input[type="checkbox"]{accent-color:var(--moss);width:16px;height:16px}
 .rd-note{position:absolute;left:10px;bottom:10px;z-index:3;max-width:80%;padding:6px 10px;background:rgba(9,18,15,.88);border:1px solid var(--line-s);font:400 11px/1.4 var(--f-mono);letter-spacing:.08em;opacity:0;pointer-events:none;transition:opacity .25s}
 .rd-note.on{opacity:1}
 .rctl .chip[aria-pressed="true"]{border-color:var(--moss);color:var(--moss)}
+
+/* ajuste al ancho: la página ocupa todo el ancho y se desplaza en vertical */
+.rd.is-fit-width .rd-stage{align-items:flex-start;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--moss-d) transparent}
+.rd.is-fit-width .rd-frame{height:auto;width:100%;max-width:none;min-height:100%;align-items:flex-start}
+.rd.is-fit-width .rd-img{width:100%;max-width:none;max-height:none;height:auto}
+
+/* pantalla completa del lector */
+html.r-locked,html.r-locked body{overflow:hidden}
+.rfull:fullscreen,.rfull.is-full{position:fixed;inset:0;z-index:35;display:flex;flex-direction:column;gap:8px;padding:12px;margin:0;background:#060b09;border:0;overflow:hidden}
+.rfull:fullscreen .rfull-body,.rfull.is-full .rfull-body{flex:1 1 auto;min-height:0;display:flex}
+.rfull:fullscreen .rd,.rfull.is-full .rd{flex:1 1 auto;height:auto;min-height:0}
+.rfull:fullscreen .rnav,.rfull.is-full .rnav{margin-top:0}
 .rnav{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
 .chs{margin:12px 0 0;display:flex;flex-wrap:wrap;gap:6px}
 .chs button{padding:7px 10px;border:1px solid var(--line);background:transparent;color:var(--haze);font:500 11px var(--f-mono);letter-spacing:.08em;border-radius:2px}
