@@ -1,0 +1,40 @@
+# Despliegue simple: la app + PostgreSQL + volumen para las imágenes subidas.
+# Copiá .env.example a .env, completá los valores y corré:  docker compose up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: valle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definí POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: valle
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U valle -d valle"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://valle:${POSTGRES_PASSWORD}@db:5432/valle
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:3000}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Definí ADMIN_USERNAME en .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Definí ADMIN_PASSWORD en .env}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - uploads:/data/uploads
+
+volumes:
+  dbdata:
+  uploads:
